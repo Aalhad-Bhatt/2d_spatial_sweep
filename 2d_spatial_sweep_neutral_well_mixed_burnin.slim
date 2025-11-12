@@ -11,11 +11,11 @@ initialize() {
 
 	params = Dictionary(
 		"seed", getSeed(),
-		"L1", 5, // height
-		"L2", 5, // width
+		"L1", 9, // height
+		"L2", 11, // width
 		"m", 0.25, // migration rate between neighboring demes
 		"s", 0.05, // strength of selection
-		"rho", 500, // number of individuals per deme (total population size = rho * L1 * L2)
+		"rho", 100, // number of individuals per deme (total population size = rho * L1 * L2)
 		"r", 0, // recombination rate (note that this script assumes diploid population)
 		"GENOME_LENGTH", 1e6,
 		"OUTDIR", "./",
@@ -33,7 +33,7 @@ initialize() {
 		}
 	}
 	if (!exists("BURNIN")) {
-		defineConstant("BURNIN", L1 * L2 * rho);
+		defineConstant("BURNIN", 0);
 	}
 	params.setValue("BURNIN", BURNIN);	
 	defineConstant("PARAMS", params);
@@ -94,7 +94,7 @@ BURNIN late() {
 	target = sample(p2.haplosomes, 1);
 	target.addNewDrawnMutation(m1, asInteger(GENOME_LENGTH/2));
 }
-BURNIN:(BURNIN+10000) late() {
+BURNIN:(BURNIN+1000) late() {
 	if (sim.countOfMutationsOfType(m1) == 0) {
 		catn(community.tick);
 		catn("LOST -- RESTARTING\n");		
@@ -116,8 +116,8 @@ BURNIN:(BURNIN+10000) late() {
 		
 	}
 }
-BURNIN+10000 late() {
-	catn("Sweep is still on-going after 10k gen.\n");
+BURNIN+1000 late() {
+	catn("Sweep is still on-going after 1k gen.\n");
 	if (sim.treeSeqCoalesced()){
 		catn("COALESCED");
 	}
