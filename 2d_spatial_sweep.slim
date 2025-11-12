@@ -1,4 +1,4 @@
-// Eventually scale upto L = 500, rho = 5e2, m=0.25, s=0.05 (probably too big for SLiMGUI, so run it through command line on a cluster.)
+// Eventually scale upto L = 500, rho = 500, m=0.25, s=0.05 (probably too big for SLiMGUI, so run it through command line on a cluster.)
 // N ~ 10^7 >> L^2/m ~ 10^6 >> L/sqrt(ms) ~ 10^4/2
 // Simulation re-run from the beginning of the sweep if the selected mutation is lost, and the simulation finishes when it fixes or it reaches gen 10k (at which point the frequency is hopefully very close to 1). Tree-sequence is saved.
 // Using pyslim, one can recapitate the tree sequence and find the MRCA before the sweep, which isn't simulated here. You can also sprinkle neutral mutations on. 
@@ -10,16 +10,16 @@ initialize() {
 
 	params = Dictionary(
 		"seed", getSeed(),
-		"L1", 5, // height
-		"L2", 5, // width
+		"L1", 10, // height
+		"L2", 10, // width
 		"m", 0.25, // migration rate between neighboring demes
-		"s", 0.05, // strength of selection
-		"rho", 500, // number of individuals per deme (total population size = rho * L1 * L2)
-		"r", 0, // recombination rate (note that this script assumes diploid population)
+		"s", 0.005, // strength of selection
+		"rho", 100, // number of individuals per deme (total population size = rho * L1 * L2)
+		"r", 1e-8, // recombination rate (note that this script assumes diploid population)
 		"GENOME_LENGTH", 1e6,
 		"OUTDIR", "./",
 		"OUTNAME", "out",
-		"ploidy", "h" // use "h" for haploid or "d" for diploid
+		"ploidy", "d" // use "h" for haploid or "d" for diploid
 	); 
 	for (k in params.allKeys) {
 		// if the parameter is not modified with -d, get default value from dictionary.
@@ -86,7 +86,7 @@ initialize() {
 	target = sample(p1.haplosomes, 1);
 	target.addNewDrawnMutation(m1, asInteger(GENOME_LENGTH/2));
 }
-1:10000 late() {
+1:100000 late() {
 	if (sim.countOfMutationsOfType(m1) == 0) {
 		catn(community.tick);
 		catn("LOST -- RESTARTING\n");		
@@ -103,8 +103,8 @@ initialize() {
 		
 	}
 }
-10000 late() {
-	catn("Sweep is still on-going after 10k gen.\n");
+100000 late() {
+	catn("Sweep is still on-going after 100k gen.\n");
 	sim.treeSeqOutput(TREEOUT, metadata=PARAMS);
 	sim.simulationFinished();
 

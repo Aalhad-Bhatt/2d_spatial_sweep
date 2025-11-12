@@ -8,7 +8,8 @@ import sys
 import gc
 
 ts_name = str(sys.argv[1])
-post_sweep_time = int(sys.argv[2])
+n = int(sys.argv[2])
+post_sweep_time = int(sys.argv[3])
 
 ts = tskit.load(f"{ts_name}.trees")
 print(f"ts loaded at {datetime.now()}")
@@ -23,12 +24,26 @@ rho = metadata['rho'][0]
 r = metadata['r'][0]
 m = metadata['m'][0]
 
-demography = msprime.Demography.from_tree_sequence(ts)
+
 root_times = set([ts.node(n).time for t in ts.trees() for n in t.roots])
 recap_time = root_times.pop()
 
 total_pops = L1 * L2
 
+alive_inds = pyslim.individuals_alive_at(ts, 0)
+keep_indivs = np.random.choice(alive_inds, n, replace=False)
+keep_nodes = []
+for i in keep_indivs:
+  keep_nodes.extend(ts.individual(i).nodes)
+
+sts = ts.simplify(keep_nodes, keep_input_roots=True)
+
+print(f"Before, there were {ts.num_samples} sample nodes (and {ts.num_individuals} individuals)\n"
+      f"in the tree sequence, and now there are {sts.num_samples} sample nodes\n"
+      f"(and {sts.num_individuals} individuals).")
+
+
+demography = msprime.Demography.from_tree_sequence(sts)
 # Add the final ancestral population
 demography.add_population(
     name="ancestral",
@@ -36,81 +51,38 @@ demography.add_population(
     initial_size=total_pops * rho
 )
 
-# Helper function to generate unique time offsets
-def get_next_time(current_time, iteration):
-    return np.nextafter(current_time, (iteration + 2) * current_time)
+
 
 # Pre-set all initial population sizes (much faster than doing it in the loop)
 print(f"Setting initial population sizes at {datetime.now()}")
-for i in range(total_pops):
-    pop_name = f"p{i+1}"
-    if pop_name in demography:
-        demography[pop_name].initial_size = rho
 
-# Build all demographic events in a batch
-print(f"Building demographic events at {datetime.now()}")
-level = 0
-time_offset = recap_time
-num_current_pops = total_pops
+derived = [f"p{i+1}" for i in range(total_pops)]
 
-# Collect all populations and splits to add at once
-intermediate_pops = []
-all_splits = []
+for i in derived:
+    #if i in demography:
+    demography[i].initial_size = rho
+ancestral_name = "ancestral"
+split_time = np.nextafter(recap_time, 2 * recap_time)
 
-while num_current_pops > 1:
-    num_groups = (num_current_pops + 98) // 99
+# Add admixture event that combines all populations at once
 
-    for group_idx in range(num_groups):
-        start_idx = group_idx * 99
-        end_idx = min((group_idx + 1) * 99, num_current_pops)
+demography.add_population_split(split_time, derived=derived, ancestral=ancestral_name)
 
-        # Generate names for this group
-        if level == 0:
-            derived = [f"p{i+1}" for i in range(start_idx, end_idx)]
-        else:
-            derived = [f"p{i}_ancestral_level{level-1}" for i in range(start_idx, end_idx)]
 
-        # Determine ancestral name
-        if num_groups == 1:
-            ancestral_name = "ancestral"
-        else:
-            ancestral_name = f"p{group_idx}_ancestral_level{level}"
-            # Store intermediate population info to add later
-            intermediate_pops.append((ancestral_name, len(derived) * rho))
 
-        # Store split info
-        split_time = get_next_time(time_offset, level * 1000 + group_idx)
-        all_splits.append((split_time, derived, ancestral_name))
-
-        del derived
-
-    num_current_pops = num_groups
-    level += 1
-    time_offset = get_next_time(time_offset, level * 1000)
-
-print(f"Adding {len(intermediate_pops)} intermediate populations at {datetime.now()}")
-# Add all intermediate populations at once
-for pop_name, initial_size in intermediate_pops:
-    demography.add_population(name=pop_name, initial_size=initial_size)
-
-print(f"Adding {len(all_splits)} population splits at {datetime.now()}")
-# Add all splits at once
-for split_time, derived, ancestral in all_splits:
-    demography.add_population_split(split_time, derived=derived, ancestral=ancestral)
-
-# Clean up
-del intermediate_pops, all_splits
-gc.collect()
-
-print(f"Demography setup complete with {level} levels of merging at {datetime.now()}")
+print(f"Demography setup complete with {total_pops} populations merged at {datetime.now()}")
 
 
 rts = pyslim.recapitate(
-        ts, demography=demography,
+        sts, demography=demography,
         recombination_rate=r,
-        random_seed=4
+        random_seed=8474871
 )
 print(f"recapitation completed. Adding neutral mutations at {datetime.now()}")
+orig_max_roots = max(t.num_roots for t in ts.trees())
+recap_max_roots = max(t.num_roots for t in rts.trees())
+print(f"Maximum number of roots before recapitation: {orig_max_roots}\n"
+      f"After recapitation: {recap_max_roots}")
 
 # delete ts and demography to save working memory
 del ts, demography

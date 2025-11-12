@@ -1,8 +1,6 @@
-name: 2d-sweep
+name: msprime_base
 channels:
   - conda-forge
-  - bioconda
-  - defaults
 dependencies:
   - python=3.11.13
   - jupyter
@@ -14,6 +12,3 @@ dependencies:
   - slim
   - msprime
   - tskit
-  - pip
-  - pip:
-    - pyslim
